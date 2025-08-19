@@ -1,3 +1,4 @@
 # MyFirstExtension
-Extensión de 3D Slicer para practicar. Funcionalidades implementadas:
-- Hallar el punto medio del centro de una masa creada con puntos o markups.
+Making a 3D Slicer extension to practice. Current functionalities implemented:
+- Calculate the center of mass of markups.
+- Auto-update checkbox so that even when the markup is not placed, the center of mass is already calculated.

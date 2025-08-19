@@ -141,6 +141,8 @@ class MyFirstModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.logic = None
         self._parameterNode = None
         self._parameterNodeGuiTag = None
+        self.observedMarkupNode = None
+        self._markupsObserverTag = None
 
     def setup(self) -> None:
         """Called when the user opens the module the first time and the widget is initialized."""
@@ -172,6 +174,9 @@ class MyFirstModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
+
+        # Auto-update checkbox
+        self.ui.autoUpdateCheckBox.connect("toggled(bool)", self.onEnableAutoUpdate)
 
     def cleanup(self) -> None:
         """Called when the application closes and the module widget is destroyed."""
@@ -252,6 +257,23 @@ class MyFirstModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 # If additional output volume is selected then result with inverted threshold is written there
                 self.logic.process(self.ui.inputSelector.currentNode(), self.ui.invertedOutputSelector.currentNode(),
                                    self.ui.imageThresholdSliderWidget.value, not self.ui.invertOutputCheckBox.checked, showResult=False)
+
+    def onEnableAutoUpdate(self, autoUpdate):
+        # If it is already in used remove the observer
+        if self._markupsObserverTag:
+            self.observedMarkupNode.RemoveObserver(self._markupsObserverTag)
+            self.observedMarkupNode = None
+            self._markupsObserverTag = None
+
+        # If autoupdate checkbox is marked and an input point is selected the observer calls the apply button
+        if autoUpdate and self.ui.inputSelector.currentNode:
+            self.observedMarkupNode = self.ui.inputSelector.currentNode()
+            self._markupsObserverTag = self.observedMarkupNode.AddObserver(
+                slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.onMarkupsUpdate
+            )
+
+    def onMarkupsUpdate(self, caller=None, event=None):
+        self.onApplyButton()
 
 
 #
