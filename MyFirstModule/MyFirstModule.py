@@ -15,7 +15,7 @@ from slicer.parameterNodeWrapper import (
 )
 
 from slicer import vtkMRMLScalarVolumeNode
-
+from slicer import vtkMRMLMarkupsFiducialNode
 
 #
 # MyFirstModule
@@ -29,7 +29,7 @@ class MyFirstModule(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = _("MyFirstModule")  # TODO: make this more human readable by adding spaces
+        self.parent.title = _("Center of Mass")  # TODO: make this more human readable by adding spaces
         # TODO: set categories (folders where the module shows up in the module selector)
         self.parent.categories = [translate("qSlicerAbstractCoreModule", "Examples")]
         self.parent.dependencies = []  # TODO: add here list of module names that this module requires
@@ -117,7 +117,7 @@ class MyFirstModuleParameterNode:
     invertedVolume - The output volume that will contain the inverted thresholded volume.
     """
 
-    inputVolume: vtkMRMLScalarVolumeNode
+    inputVolume: vtkMRMLMarkupsFiducialNode
     imageThreshold: Annotated[float, WithinRange(-100, 500)] = 100
     invertThreshold: bool = False
     thresholdedVolume: vtkMRMLScalarVolumeNode
@@ -232,11 +232,11 @@ class MyFirstModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self._checkCanApply()
 
     def _checkCanApply(self, caller=None, event=None) -> None:
-        if self._parameterNode and self._parameterNode.inputVolume and self._parameterNode.thresholdedVolume:
-            self.ui.applyButton.toolTip = _("Compute output volume")
+        if self._parameterNode and self._parameterNode.inputVolume:
+            self.ui.applyButton.toolTip = _("Compute center of mass")
             self.ui.applyButton.enabled = True
         else:
-            self.ui.applyButton.toolTip = _("Select input and output volume nodes")
+            self.ui.applyButton.toolTip = _("Select input point list")
             self.ui.applyButton.enabled = False
 
     def onApplyButton(self) -> None:
@@ -245,6 +245,7 @@ class MyFirstModuleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             # Compute output
             self.logic.process(self.ui.inputSelector.currentNode(), self.ui.outputSelector.currentNode(),
                                self.ui.imageThresholdSliderWidget.value, self.ui.invertOutputCheckBox.checked)
+            self.ui.centerOfMassValueLabel.text = str(self.logic.centerOfMass)
 
             # Compute inverted output (if needed)
             if self.ui.invertedOutputSelector.currentNode():
@@ -275,44 +276,36 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
     def getParameterNode(self):
         return MyFirstModuleParameterNode(super().getParameterNode())
 
+    def getCenterOfMass(self, markupsNode):
+        centerOfMass = [0,0,0]
+        
+        import numpy as np
+        sumPos = np.zeros(3)
+        for i in range(markupsNode.GetNumberOfControlPoints()):
+            pos = markupsNode.GetNthControlPointPosition(i)
+            sumPos += pos
+
+        centerOfMass = sumPos / markupsNode.GetNumberOfControlPoints()
+
+        logging.info(f'Center of mass for {markupsNode.GetName()}: {centerOfMass}')
+        return centerOfMass
+
     def process(self,
-                inputVolume: vtkMRMLScalarVolumeNode,
+                inputMarkups: vtkMRMLMarkupsFiducialNode,
                 outputVolume: vtkMRMLScalarVolumeNode,
                 imageThreshold: float,
-                invert: bool = False,
-                showResult: bool = True) -> None:
+                enableScreenshots=0):
         """
-        Run the processing algorithm.
-        Can be used without GUI widget.
-        :param inputVolume: volume to be thresholded
+        Compute center of mass of input markup points
+        :param inputMarkups: TODO
         :param outputVolume: thresholding result
         :param imageThreshold: values above/below this threshold will be set to 0
-        :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
-        :param showResult: show output volume in slice viewers
+        :param enableScreenshots: TODO
         """
 
-        if not inputVolume or not outputVolume:
-            raise ValueError("Input or output volume is invalid")
-
-        import time
-
-        startTime = time.time()
-        logging.info("Processing started")
-
-        # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
-        cliParams = {
-            "InputVolume": inputVolume.GetID(),
-            "OutputVolume": outputVolume.GetID(),
-            "ThresholdValue": imageThreshold,
-            "ThresholdType": "Above" if invert else "Below",
-        }
-        cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
-        # We don't need the CLI module node anymore, remove it to not clutter the scene with it
-        slicer.mrmlScene.RemoveNode(cliNode)
-
-        stopTime = time.time()
-        logging.info(f"Processing completed in {stopTime-startTime:.2f} seconds")
-
+        self.centerOfMass = self.getCenterOfMass(inputMarkups)        
+        return True
+    
 
 #
 # MyFirstModuleTest
