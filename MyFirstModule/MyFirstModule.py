@@ -3,6 +3,8 @@ import os
 from typing import Annotated, Optional
 
 import vtk
+import numpy as np
+from scipy.optimize import least_squares
 
 import slicer
 from slicer.i18n import tr as _
@@ -16,6 +18,8 @@ from slicer.parameterNodeWrapper import (
 
 from slicer import vtkMRMLScalarVolumeNode
 from slicer import vtkMRMLMarkupsFiducialNode
+
+
 
 #
 # MyFirstModule
@@ -302,7 +306,6 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
     def getCenterOfMass(self, markupsNode):
         centerOfMass = [0,0,0]
         
-        import numpy as np
         sumPos = np.zeros(3)
         for i in range(markupsNode.GetNumberOfControlPoints()):
             pos = markupsNode.GetNthControlPointPosition(i)
@@ -313,16 +316,21 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
         logging.info(f'Center of mass for {markupsNode.GetName()}: {centerOfMass}')
         return centerOfMass
 
-    def drawSphere(self, center, radius):
+    def drawSphere(self, p1):
         # Create data node
         # Create display nodes with info for the data node
         # Add to the scene 
         # Apply transform
+        a = np.array(self.centerOfMass)
+        b = np.array(p1) 
+
+        radius = np.linalg.norm(a - b)
 
         # Create and set up polydata source
         sphere = vtk.vtkSphereSource()
         sphere.SetRadius(radius)
-        sphere.SetCenter(center)
+        sphere.SetCenter(a)
+        sphere.SetPhiResolution(30)
 
         # Create a model node that displays output of the source
         sphereNode = slicer.modules.models.logic().AddModel(sphere.GetOutputPort())
@@ -330,6 +338,29 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
         # Adjust display properties
         sphereNode.GetDisplayNode().SetColor(0,0,1)
         sphereNode.GetDisplayNode().SetOpacity(0.8)
+        
+    def UpdateSphere(self, inputMarkups):
+        sphere = vtk.vtkSphereSource()
+
+        # Use the first of the markups to calculate the radius 
+        p1 = inputMarkups.GetNthControlPointPosition(0)
+        radius = np.linalg.norm(self.centerOfMass - p1)
+
+        sphere.SetCenter(self.centerOfMass)
+        sphere.SetRadius(radius)
+        sphere.SetPhiResolution(30)
+        sphere.SetThetaResolution(30)
+        sphere.Update()
+
+        # Create model node and add to scene
+        modelsLogic = slicer.modules.models.logic()
+        model = modelsLogic.AddModel(sphere.GetOutput())
+        model.GetDisplayNode().SetVisibility2D(True)
+        model.GetDisplayNode().SetSliceIntersectionThickness(3)
+        model.GetDisplayNode().SetColor(1,0,0)
+
+        # Call UpdateSphere whenever the control points are changed
+        inputMarkups.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.UpdateSphere, 2)
 
     def process(self,
                 inputMarkups: vtkMRMLMarkupsFiducialNode,
@@ -345,11 +376,8 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
         """
 
         self.centerOfMass = self.getCenterOfMass(inputMarkups)
-
-        # TODO calculate real radius
-        radius = 10
-
-        self.drawSphere(self.centerOfMass, radius)
+        
+        self.UpdateSphere(inputMarkups)
 
         return True
     
