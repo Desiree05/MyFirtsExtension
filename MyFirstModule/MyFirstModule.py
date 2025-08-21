@@ -122,6 +122,7 @@ class MyFirstModuleParameterNode:
     invertThreshold: bool = False
     thresholdedVolume: vtkMRMLScalarVolumeNode
     invertedVolume: vtkMRMLScalarVolumeNode
+    autoUpdate: bool = False
 
 
 #
@@ -319,13 +320,18 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
                 enableScreenshots=0):
         """
         Compute center of mass of input markup points
-        :param inputMarkups: TODO
+        :param inputMarkups: list of markups
         :param outputVolume: thresholding result
         :param imageThreshold: values above/below this threshold will be set to 0
         :param enableScreenshots: TODO
         """
 
-        self.centerOfMass = self.getCenterOfMass(inputMarkups)        
+        self.centerOfMass = self.getCenterOfMass(inputMarkups)
+
+        print("PROBANDO")
+        modelNode = slicer.util.getNode('F')
+        print(modelNode)
+
         return True
     
 
