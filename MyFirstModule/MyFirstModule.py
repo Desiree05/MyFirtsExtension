@@ -313,6 +313,24 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
         logging.info(f'Center of mass for {markupsNode.GetName()}: {centerOfMass}')
         return centerOfMass
 
+    def drawSphere(self, center, radius):
+        # Create data node
+        # Create display nodes with info for the data node
+        # Add to the scene 
+        # Apply transform
+
+        # Create and set up polydata source
+        sphere = vtk.vtkSphereSource()
+        sphere.SetRadius(radius)
+        sphere.SetCenter(center)
+
+        # Create a model node that displays output of the source
+        sphereNode = slicer.modules.models.logic().AddModel(sphere.GetOutputPort())
+
+        # Adjust display properties
+        sphereNode.GetDisplayNode().SetColor(0,0,1)
+        sphereNode.GetDisplayNode().SetOpacity(0.8)
+
     def process(self,
                 inputMarkups: vtkMRMLMarkupsFiducialNode,
                 outputVolume: vtkMRMLScalarVolumeNode,
@@ -328,9 +346,10 @@ class MyFirstModuleLogic(ScriptedLoadableModuleLogic):
 
         self.centerOfMass = self.getCenterOfMass(inputMarkups)
 
-        print("PROBANDO")
-        modelNode = slicer.util.getNode('F')
-        print(modelNode)
+        # TODO calculate real radius
+        radius = 10
+
+        self.drawSphere(self.centerOfMass, radius)
 
         return True
     
